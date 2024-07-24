@@ -6,6 +6,9 @@ import os
 import xlsxwriter
 import openpyxl
 
+# 两个功能： 1. 通过HashTag搜索达人
+#          2. 通过handle name找到达人的邮箱
+
 workbook = xlsxwriter.Workbook('Creator_Info.xlsx')
 worksheet = workbook.add_worksheet()
 handleList = []
@@ -71,7 +74,7 @@ async def get_hash_tag(api, hashtag):
 async def trending_videos():
     async with TikTokApi() as api:
         await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
-        dataframe = openpyxl.load_workbook("HashTags.xlsx")
+        dataframe = openpyxl.load_workbook("../pythonProject/Files/TikTokAPI - HashTags.xlsx")
         sheet = dataframe.active
         hashtags = [cell.value for cell in sheet['A']]
         row = 0
@@ -107,6 +110,7 @@ async def trending_videos():
                     print(follower_count)
                     # print("Signature: " + signature)
                     print()
+
                     row += 1
             except AttributeError as e:
                 print(f"AttributeError encountered for hashtag '{hashtag}' : {e}")
@@ -149,6 +153,15 @@ def modify_email(signature):
         #         signature = None
 
         return signature
+
+video_id = 7248300636498890011
+async def get_comments():
+    async with TikTokApi() as api:
+        await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
+        video = api.video(id=video_id)
+        async for comment in video.comments(count=30):
+            print(comment)
+            print(comment.as_dict)
 
 
 

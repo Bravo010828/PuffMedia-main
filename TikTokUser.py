@@ -1,10 +1,16 @@
 import re
 
+import pandas as pd
 from TikTokApi import TikTokApi
 import asyncio
 import os
 import xlsxwriter
 import openpyxl
+from datetime import datetime, timedelta
+
+# 两个功能： 1. 通过HashTag搜索近期发布视频中带这个hashtag的达人
+#          2. 通过handle name找到达人bios中存在的邮箱
+#          3. 通过handle name找到达人在某个时间段发布的视频以及视频的数据
 
 workbook = xlsxwriter.Workbook('Creator_Info.xlsx')
 worksheet = workbook.add_worksheet()
@@ -71,7 +77,7 @@ async def get_hash_tag(api, hashtag):
 async def trending_videos():
     async with TikTokApi() as api:
         await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
-        dataframe = openpyxl.load_workbook("HashTags.xlsx")
+        dataframe = openpyxl.load_workbook("HandleList.xlsx")
         sheet = dataframe.active
         hashtags = [cell.value for cell in sheet['A']]
         row = 0
@@ -107,6 +113,7 @@ async def trending_videos():
                     print(follower_count)
                     # print("Signature: " + signature)
                     print()
+
                     row += 1
             except AttributeError as e:
                 print(f"AttributeError encountered for hashtag '{hashtag}' : {e}")
@@ -149,6 +156,60 @@ def modify_email(signature):
         #         signature = None
 
         return signature
+
+video_id = 7406050259207507242
+async def get_comments():
+    async with TikTokApi() as api:
+        await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
+        video = api.video(id=video_id)
+        print(video.as_dict())
+        # async for comment in video.comments(count=30):
+        #     print(comment)
+        #     print(comment.as_dict)
+
+async def get_videos():
+    target_handle = "rosashopping_"
+    published_after = datetime(2025, 5, 23)
+    video_stats = []
+    async with TikTokApi() as api:
+        await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
+        user = api.user(target_handle)
+
+        async for video in user.videos():
+            data = video.as_dict
+            created_at = datetime.utcfromtimestamp(data['createTime']) + timedelta(hours=8)
+            if created_at < published_after:
+                continue
+
+            stats = data.get('stats', {})
+            play_count = stats.get("playCount", 0)
+            like = stats.get("diggCount", 0)
+            comment = stats.get("commentCount", 0)
+            share = stats.get("shareCount", 0)
+
+            if play_count > 0:
+                engagement_rate = (like + comment + share) / play_count * 100
+            else:
+                engagement_rate = 0.0
+
+            stats = data.get('stats', {})
+            video_stats.append({
+                "video_id": data.get("id"),
+                "video_url": f"https://www.tiktok.com/@{target_handle}/video/{data['id']}",
+                "created_at": created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "desc":data.get("desc", ""),
+                "play_count": play_count,
+                "like_count": like,
+                "comment_count": comment,
+                "share_count": share,
+                "engagement_rate (%)": round(engagement_rate, 2)
+            })
+
+            df = pd.DataFrame(video_stats)
+            df.to_excel(f"{target_handle}_video_stats.xlsx", index=False)
+            print(f"✅ 成功导出 {len(df)} 条视频数据为 {target_handle}_video_stats.xlsx")
+
+
 
 
 

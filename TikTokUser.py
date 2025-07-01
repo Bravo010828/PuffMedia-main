@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 # 两个功能： 1. 通过HashTag搜索近期发布视频中带这个hashtag的达人
 #          2. 通过handle name找到达人bios中存在的邮箱
 #          3. 通过handle name找到达人在某个时间段发布的视频以及视频的数据
-
 workbook = xlsxwriter.Workbook('Creator_Info.xlsx')
 worksheet = workbook.add_worksheet()
 handleList = []
@@ -160,16 +159,16 @@ def modify_email(signature):
 video_id = 7406050259207507242
 async def get_comments():
     async with TikTokApi() as api:
-        await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
+        await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, browser=os.getenv("TIKTOK_BROWSER", "chromium"))
         video = api.video(id=video_id)
-        print(video.as_dict())
-        # async for comment in video.comments(count=30):
-        #     print(comment)
-        #     print(comment.as_dict)
+        count = 0
+        async for comment in video.comments(count=30):
+            print(comment)
+            print(comment.as_dict)
 
 async def get_videos():
-    target_handle = "rosashopping_"
-    published_after = datetime(2025, 5, 23)
+    target_handle = "trendymenswearhub"
+    published_after = datetime(2025, 6, 12)
     video_stats = []
     async with TikTokApi() as api:
         await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
@@ -210,8 +209,65 @@ async def get_videos():
             print(f"✅ 成功导出 {len(df)} 条视频数据为 {target_handle}_video_stats.xlsx")
 
 
+handles = ['hallie_grace8']
+days_limit = 30
+cutoff_date = datetime.now() - timedelta(days=days_limit)
 
+async def get_recent_videos_with_estimated_gmv():
+    all_data = []
+
+    async with TikTokApi() as api:
+        await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
+
+        for handle in handles:
+            try:
+                user = api.user(username=handle)
+                async for video in user.videos(count=50):
+                    data = video.as_dict
+                    if "createTime" not in data:
+                        continue
+
+                    create_time = datetime.utcfromtimestamp(data['createTime'])
+                    if create_time < cutoff_date:
+                        continue
+
+                    stats = data.get("stats", {})
+                    views = stats.get("playCount", 0)
+                    likes = stats.get("diggCount", 0)
+                    comments = stats.get("commentCount", 0)
+                    shares = stats.get("shareCount", 0)
+                    desc = data.get("desc", "")
+                    has_product = (
+                            "tiktok.com/product" in desc or
+                            "https://s.tiktok.com" in desc or
+                            "buy now" in desc.lower() or
+                            "$" in desc
+                    )
+
+                    engagement_rate = 0
+                    if views > 0:
+                        engagement_rate = round((likes + comments + shares) / views * 100, 2)
+
+                    all_data.append({
+                        "handle": handle,
+                        "video_url": f"https://www.tiktok.com/@{handle}/video/{data['id']}",
+                        "created_at": create_time.strftime("%Y-%m-%d"),
+                        "views": views,
+                        "likes": likes,
+                        "comments": comments,
+                        "shares": shares,
+                        "has_product": has_product,
+                        "engagement_rate (%)": engagement_rate,
+                        "estimated_gmv": round(views * 0.01 * 20 if has_product else 0, 2)
+                    })
+
+            except Exception as e:
+                print(f"❌ Error for {handle}: {e}")
+
+    df = pd.DataFrame(all_data)
+    df.to_excel("recent_30_days_gmv.xlsx", index=False)
+    print(f"✅ 成功导出 {len(df)} 条视频记录到 recent_30_days_gmv.xlsx")
 
 
 if __name__ == "__main__":
-    asyncio.run(search_handle_name())
+    asyncio.run(get_recent_videos_with_estimated_gmv())

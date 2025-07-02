@@ -225,16 +225,16 @@ def has_product(video_data):
                 return True
 
     # 2. Check for TikTok Shop/product hashtags in description
-    desc = video_data.get("desc", "").lower()
-    shop_keywords = [
-        "tiktokshop", "tiktok shop", "shop", "product", "buy now", "newmakeupproduct"
-    ]
-    if any(keyword in desc for keyword in shop_keywords):
-        return True
+    # desc = video_data.get("desc", "").lower()
+    # shop_keywords = [
+    #     "tiktokshop", "tiktok shop", "shop", "product", "buy now", "newmakeupproduct"
+    # ]
+    # if any(keyword in desc for keyword in shop_keywords):
+    #     return True
 
-    # 3. Check for $ sign (optional)
-    if "$" in desc:
-        return True
+    # # 3. Check for $ sign (optional)
+    # if "$" in desc:
+    #     return True
 
     return False
 
@@ -262,9 +262,9 @@ async def get_recent_videos_with_estimated_gmv():
                     comments = stats.get("commentCount", 0)
                     shares = stats.get("shareCount", 0)
                     desc = data.get("desc", "")
-                    # --- Updated has_product logic ---
+                    # --- has_product ---
                     has_product_flag = has_product(data)
-                    print(has_product_flag)
+                    # print
 
                     engagement_rate = 0
                     if views > 0:
@@ -290,7 +290,22 @@ async def get_recent_videos_with_estimated_gmv():
     df.to_excel("recent_30_days_gmv.xlsx", index=False)
     print(f"✅ 成功导出 {len(df)} 条视频记录到 recent_30_days_gmv.xlsx")
 
-
+async def print_one_video_info(video_url):
+    async with TikTokApi() as api:
+        await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
+        video = api.video(url=video_url)
+        video_info = await video.info()
+        print(video_info)
+        print("Video description:", video_info.get("desc", ""))
+        print("Anchors:", video_info.get("anchors", []))
+        if has_product(video_info):
+            print("✅ This video HAS a product.")
+        else:
+            print("❌ This video does NOT have a product.")
+        
 
 if __name__ == "__main__":
     asyncio.run(get_recent_videos_with_estimated_gmv())
+
+    # video_url = "https://www.tiktok.com/@hallie_grace8/video/7522264807345638687"  # Replace @username!
+    # asyncio.run(print_one_video_info(video_url))

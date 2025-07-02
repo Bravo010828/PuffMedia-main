@@ -270,4 +270,4 @@ async def get_recent_videos_with_estimated_gmv():
 
 
 if __name__ == "__main__":
-    asyncio.run(get_recent_videos_with_estimated_gmv())
+    asyncio.run(search_handle_name())

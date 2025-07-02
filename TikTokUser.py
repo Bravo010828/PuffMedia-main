@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 # 两个功能： 1. 通过HashTag搜索近期发布视频中带这个hashtag的达人
 #          2. 通过handle name找到达人bios中存在的邮箱
 #          3. 通过handle name找到达人在某个时间段发布的视频以及视频的数据
+
+
 workbook = xlsxwriter.Workbook('Creator_Info.xlsx')
 worksheet = workbook.add_worksheet()
 handleList = []
@@ -213,6 +215,29 @@ handles = ['hallie_grace8']
 days_limit = 30
 cutoff_date = datetime.now() - timedelta(days=days_limit)
 
+def has_product(video_data):
+    # 1. Check for product anchors
+    anchors = video_data.get("anchors", [])
+    for anchor in anchors:
+        if anchor.get("type") in [33, 35]:
+            extra = anchor.get("extra", "")
+            if "product_id" in extra or "shop" in extra.lower():
+                return True
+
+    # 2. Check for TikTok Shop/product hashtags in description
+    desc = video_data.get("desc", "").lower()
+    shop_keywords = [
+        "tiktokshop", "tiktok shop", "shop", "product", "buy now", "newmakeupproduct"
+    ]
+    if any(keyword in desc for keyword in shop_keywords):
+        return True
+
+    # 3. Check for $ sign (optional)
+    if "$" in desc:
+        return True
+
+    return False
+
 async def get_recent_videos_with_estimated_gmv():
     all_data = []
 
@@ -237,12 +262,9 @@ async def get_recent_videos_with_estimated_gmv():
                     comments = stats.get("commentCount", 0)
                     shares = stats.get("shareCount", 0)
                     desc = data.get("desc", "")
-                    has_product = (
-                            "tiktok.com/product" in desc or
-                            "https://s.tiktok.com" in desc or
-                            "buy now" in desc.lower() or
-                            "$" in desc
-                    )
+                    # --- Updated has_product logic ---
+                    has_product_flag = has_product(data)
+                    print(has_product_flag)
 
                     engagement_rate = 0
                     if views > 0:
@@ -256,9 +278,9 @@ async def get_recent_videos_with_estimated_gmv():
                         "likes": likes,
                         "comments": comments,
                         "shares": shares,
-                        "has_product": has_product,
+                        "has_product": has_product_flag,
                         "engagement_rate (%)": engagement_rate,
-                        "estimated_gmv": round(views * 0.01 * 20 if has_product else 0, 2)
+                        "estimated_gmv": round(views * 0.01 * 20 if has_product_flag else 0, 2)
                     })
 
             except Exception as e:
@@ -267,6 +289,7 @@ async def get_recent_videos_with_estimated_gmv():
     df = pd.DataFrame(all_data)
     df.to_excel("recent_30_days_gmv.xlsx", index=False)
     print(f"✅ 成功导出 {len(df)} 条视频记录到 recent_30_days_gmv.xlsx")
+
 
 
 if __name__ == "__main__":

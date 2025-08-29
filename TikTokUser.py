@@ -40,7 +40,7 @@ async def search_handle_name():
         await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
         dataframe = openpyxl.load_workbook("HandleList.xlsx")
         sheet = dataframe.active
-        handle_list = [cell.value for cell in sheet['A']]
+        handle_list = [cell.value for cell in sheet['A'] if cell.value]
         row = 0
 
         for name in handle_list:
@@ -78,11 +78,13 @@ async def trending_videos():
         await api.create_sessions(ms_tokens=[ms_token], num_sessions=1, sleep_after=3, context_options=context_options)
         dataframe = openpyxl.load_workbook("HandleList.xlsx")
         sheet = dataframe.active
-        hashtags = [cell.value for cell in sheet['A']]
+        hashtags = [cell.value for cell in sheet['A'] if cell.value]
+        print(hashtags)
         row = 0
         # Change the tag name for different type of videos
         for hashtag in hashtags:
             tag = await get_hash_tag(api, hashtag)
+            print(tag)
             if tag is None:
                 continue
             try:
